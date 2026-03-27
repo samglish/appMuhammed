@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>📊 Abu Abbas Statistical Computing Dashboard</title>
+<style>
+body{font-family:sans-serif; margin:0; background:#f0f8ff;}
+header{background:#1e90ff; color:white; padding:15px; text-align:center;}
+marquee{font-size:14px; color:#fff; font-weight:bold;}
+.sidebar{float:left; width:220px; background:#87ceeb; height:100vh; padding:10px;}
+.sidebar button{width:100%; margin:5px 0; padding:10px; cursor:pointer; font-size:14px; border:none; background:white; color:#1e90ff;}
+.sidebar button:hover{background:#1e90ff; color:white;}
+.main{margin-left:230px; padding:20px; min-height:100vh; background:white;}
+.tab{display:none;}
+table, th, td{border:1px solid #1e90ff; border-collapse:collapse; padding:5px;}
+th{background:#b0e0e6;}
+input[type=number], input[type=text]{width:80px; margin:2px;}
+textarea{width:95%; margin:2px;}
+.console{background:#1e90ff; color:#f0f8ff; padding:10px; height:120px; overflow:auto; font-family:monospace;}
+button.inline{padding:3px 8px; margin:2px;}
+.professor{color:#d32f2f; font-weight:bold;}
+.student{color:#1565c0;}
+.marked{background:#fff59d;}
+</style>
+</head>
+<body>
+
+<header>
+<h1>📊 Abu Abbas Statistical Computing Dashboard</h1>
+<marquee behavior="scroll" direction="left" scrollamount="4">
+M.Sc Student, Department of Statistics and Operations Research, Modibbo Adama University Yola, Nigeria
+</marquee>
+</header>
+
+<div class="sidebar">
+<button onclick="openTab('data')">Data Input</button>
+<button onclick="openTab('stats')">Descriptive Stats</button>
+<button onclick="openTab('regression')">Linear Regression</button>
+<button onclick="openTab('hypothesis')">Hypothesis Testing</button>
+<button onclick="openTab('correlation')">Correlation</button>
+<button onclick="openTab('discussion')">Discussion</button>
+<button onclick="openTab('export')">Export CSV</button>
+<button onclick="clearConsole()">Clear Console</button>
+</div>
+
+<div class="main">
+
+<!-- Data Input -->
+<div id="data" class="tab">
+<h3>Manual Data Input</h3>
+<p>Variable names (comma-separated):</p>
+<input type="text" id="varInput" placeholder="e.g., Age,Weight,Score">
+<button onclick="setVariables()">Set Variables</button>
+<div id="dataInputs"></div>
+<button onclick="addRow()">Add Row</button>
+<div id="dataTable"></div>
+</div>
+
+<!-- Descriptive Stats -->
+<div id="stats" class="tab">
+<h3>Descriptive Statistics</h3>
+<p>Select variable:</p>
+<select id="descVar"></select>
+<button onclick="computeDescriptive()">Compute</button>
+<div id="descOut"></div>
+</div>
+
+<!-- Regression -->
+<div id="regression" class="tab">
+<h3>Linear Regression (Y = B0 + B1X1 + B2X2 + ...)</h3>
+<p>Select Dependent Variable (Y):</p>
+<select id="depVar"></select>
+<p>Select Independent Variables (X):</p>
+<div id="indepVarSelect"></div>
+<button onclick="computeRegression()">Compute Regression</button>
+<div id="regOut"></div>
+</div>
+
+<!-- Hypothesis Testing -->
+<div id="hypothesis" class="tab">
+<h3>Hypothesis Testing</h3>
+<p>One Sample t-test</p>
+Variable: <select id="hypVar"></select>
+Test Mean (μ0): <input type="number" id="testMean"><br>
+<button onclick="computeTTest()">Compute t-test</button>
+<div id="hypOut"></div>
+<p>Chi-square test (categorical input)</p>
+Counts (comma separated): <input type="text" id="chiCounts" placeholder="e.g., 30,20,50">
+<button onclick="computeChiSquare()">Compute Chi-square</button>
+<div id="chiOut"></div>
+</div>
+
+<!-- Correlation -->
+<div id="correlation" class="tab">
+<h3>Correlation</h3>
+Variable 1: <select id="corVar1"></select>
+Variable 2: <select id="corVar2"></select>
+<button onclick="computeCorrelation()">Compute Spearman & Kendall</button>
+<div id="corOut"></div>
+</div>
+
+<!-- Discussion -->
+<div id="discussion" class="tab">
+<h3>Discussion</h3>
+<p>Your Name:</p><input type="text" id="userName" placeholder="Enter your name"><br>
+<p>Thread Category:</p>
+<select id="threadCategory">
+<option value="Regression">Regression</option>
+<option value="Hypothesis Testing">Hypothesis Testing</option>
+<option value="Correlation">Correlation</option>
+<option value="Other">Other</option>
+</select>
+<p>Thread Title:</p><input type="text" id="threadTitle"><br>
+<button onclick="addThread()">Add Thread</button><br><br>
+
+<p>Select Thread:</p>
+<select id="threadSelect" onchange="selectThreadDropdown()">
+<option value="">--Select a thread--</option>
+</select>
+
+<div id="discussionArea" style="border:1px solid #1e90ff; padding:10px; height:250px; overflow:auto; background:#e1f5fe;"></div>
+
+<p>Role:</p>
+<select id="role">
+<option value="Student">Student</option>
+<option value="Professor">Professor</option>
+</select><br>
+<textarea id="message" rows="3" placeholder="Enter your message"></textarea><br>
+<button onclick="postMessage()">Post Message</button>
+</div>
+
+<!-- Export CSV -->
+<div id="export" class="tab">
+<h3>Export Data</h3>
+<button onclick="exportCSV()">Download CSV</button>
+</div>
+
+<h3>Console</h3>
+<div class="console" id="console"></div>
+</div>
+
+<script>
+// === Data Variables ===
+let variables=[], data=[];
+
+// === Discussion Variables ===
+let threads=[], currentThreadIndex=null;
+
+// Logging
+function log(msg){let c=document.getElementById("console"); c.innerHTML+=msg+"<br>"; c.scrollTop=c.scrollHeight;}
+function clearConsole(){document.getElementById("console").innerHTML="";}
+
+// Tabs
+function openTab(tab){let t=document.getElementsByClassName("tab"); for(let i=0;i<t.length;i++) t[i].style.display="none"; document.getElementById(tab).style.display="block";}
+
+// ===== Data Input =====
+function setVariables(){
+  let input=document.getElementById("varInput").value;
+  if(!input){alert("Enter variable names"); return;}
+  variables=input.split(",").map(v=>v.trim());
+  data=[];
+  renderDataInputs();
+  renderDataTable();
+  let descSelect=document.getElementById("descVar");
+  let depSelect=document.getElementById("depVar");
+  let hypSelect=document.getElementById("hypVar");
+  let cor1=document.getElementById("corVar1");
+  let cor2=document.getElementById("corVar2");
+  descSelect.innerHTML=""; depSelect.innerHTML=""; hypSelect.innerHTML=""; cor1.innerHTML=""; cor2.innerHTML="";
+  variables.forEach(v=>{
+    descSelect.innerHTML+="<option value='"+v+"'>"+v+"</option>";
+    depSelect.innerHTML+="<option value='"+v+"'>"+v+"</option>";
+    hypSelect.innerHTML+="<option value='"+v+"'>"+v+"</option>";
+    cor1.innerHTML+="<option value='"+v+"'>"+v+"</option>";
+    cor2.innerHTML+="<option value='"+v+"'>"+v+"</option>";
+  });
+  renderIndependentVarCheckboxes();
+  log("Variables set: "+variables.join(", "));
+}
+
+function renderDataInputs(){
+  if(variables.length==0) return;
+  let html="";
+  variables.forEach(v=>html+=v+": <input type='number' id='inp_"+v+"'><br>");
+  html+="<button onclick='addRow()'>Add Row</button>";
+  document.getElementById("dataInputs").innerHTML=html;
+}
+
+function addRow(){
+  if(variables.length==0){alert("Set variables first"); return;}
+  let row={};
+  for(let v of variables){
+    let val=document.getElementById("inp_"+v).value;
+    if(val===""){alert("Fill all fields"); return;}
+    row[v]=Number(val);
+  }
+  data.push(row); renderDataTable(); log("Row added: "+JSON.stringify(row));
+}
+
+function renderDataTable(){
+  if(data.length==0){document.getElementById("dataTable").innerHTML="No data yet"; return;}
+  let html="<table><tr>";
+  variables.forEach(v=>html+="<th>"+v+"</th>");
+  html+="</tr>";
+  data.forEach(r=>{html+="<tr>"; variables.forEach(v=>html+="<td>"+(r[v]!==undefined?r[v]:"")+"</td>"); html+="</tr>";});
+  html+="</table>";
+  document.getElementById("dataTable").innerHTML=html;
+}
+
+// ===== Descriptive Stats =====
+function computeDescriptive(){
+  let varName=document.getElementById("descVar").value;
+  if(!varName || data.length==0){alert("No variable or data"); return;}
+  let vals=data.map(r=>r[varName]);
+  let n=vals.length;
+  let mean=vals.reduce((a,b)=>a+b)/n;
+  let variance=vals.reduce((a,b)=>a+(b-mean)**2,0)/(n-1);
+  let sd=Math.sqrt(variance);
+  document.getElementById("descOut").innerHTML="Mean="+mean.toFixed(2)+", Variance="+variance.toFixed(2)+", SD="+sd.toFixed(2);
+  log("Descriptive stats computed for "+varName);
+}
+
+// ===== Regression =====
+function renderIndependentVarCheckboxes(){
+  let html=""; variables.forEach(v=>html+="<input type='checkbox' value='"+v+"' class='indepVar'>"+v+" ");
+  document.getElementById("indepVarSelect").innerHTML=html;
+}
+
+function computeRegression(){
+  let yVar=document.getElementById("depVar").value;
+  let xVars=[]; document.querySelectorAll(".indepVar:checked").forEach(c=>xVars.push(c.value));
+  if(!yVar || xVars.length==0){alert("Select Y and X variables"); return;}
+  if(xVars.length==1){
+    let X=data.map(r=>r[xVars[0]]); let Y=data.map(r=>r[yVar]);
+    let n=X.length;
+    let meanX=X.reduce((a,b)=>a+b)/n; let meanY=Y.reduce((a,b)=>a+b)/n;
+    let num=0, den=0;
+    for(let i=0;i<n;i++){num+=(X[i]-meanX)*(Y[i]-meanY); den+=(X[i]-meanX)**2;}
+    let B1=num/den; let B0=meanY-B1*meanX;
+    document.getElementById("regOut").innerHTML="Regression Equation: "+yVar+" = "+B0.toFixed(2)+" + "+B1.toFixed(2)+"*"+xVars[0];
+    log("Linear regression computed for "+yVar+" ~ "+xVars.join(", "));
+  } else {document.getElementById("regOut").innerHTML="Multiple regression formula: Y = B0 + B1X1 + B2X2 + ...";}
+}
+
+// ===== Hypothesis Testing =====
+function computeTTest(){
+  let varName=document.getElementById("hypVar").value;
+  let mu0=Number(document.getElementById("testMean").value);
+  if(!varName || data.length==0 || isNaN(mu0)){alert("Select variable and enter test mean"); return;}
+  let vals=data.map(r=>r[varName]);
+  let n=vals.length;
+  let mean=vals.reduce((a,b)=>a+b)/n;
+  let s=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/(n-1));
+  let t=(mean-mu0)/(s/Math.sqrt(n));
+  document.getElementById("hypOut").innerHTML="t = "+t.toFixed(3);
+  log("t-test computed for "+varName);
+}
+
+function computeChiSquare(){
+  let counts=document.getElementById("chiCounts").value.split(",").map(x=>Number(x.trim()));
+  let n=counts.reduce((a,b)=>a+b,0); let expected=n/counts.length;
+  let chi=counts.reduce((a,b)=>a+(b-expected)**2/expected,0);
+  document.getElementById("chiOut").innerHTML="Chi-square = "+chi.toFixed(3);
+  log("Chi-square computed for counts: "+counts.join(","));
+}
+
+// ===== Correlation =====
+function computeCorrelation(){
+  let var1=document.getElementById("corVar1").value;
+  let var2=document.getElementById("corVar2").value;
+  if(!var1 || !var2){alert("Select two variables"); return;}
+  let X=data.map(r=>r[var1]); let Y=data.map(r=>r[var2]);
+  let n=X.length;
+  function rank(arr){let sorted=arr.slice().sort((a,b)=>a-b); return arr.map(v=>sorted.indexOf(v)+1);}
+  let rx=rank(X); let ry=rank(Y);
+  let d2=rx.map((v,i)=>(v-ry[i])**2); let rs=1 - (6*d2.reduce((a,b)=>a+b,0))/(n*(n*n-1));
+  document.getElementById("corOut").innerHTML="Spearman correlation = "+rs.toFixed(3)+" (Kendall not computed)";
+  log("Correlation computed for "+var1+" & "+var2);
+}
+
+// ===== Export CSV =====
+function exportCSV(){
+  if(data.length==0){alert("No data"); return;}
+  let csv=[...variables].join(",")+"\n";
+  data.forEach(r=>{csv+=variables.map(v=>r[v]!==undefined?r[v]:"").join(",")+"\n";});
+  let blob=new Blob([csv], {type:"text/csv"});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement("a"); a.href=url; a.download="Abu_Abbas_Data.csv"; a.click();
+  log("CSV exported.");
+}
+
+// ===== Discussion =====
+function addThread(){
+  let title=document.getElementById("threadTitle").value;
+  let category=document.getElementById("threadCategory").value;
+  if(!title){alert("Enter thread title"); return;}
+  threads.push({title:title,category:category,messages:[]});
+  document.getElementById("threadTitle").value="";
+  updateThreadDropdown();
+  log("Thread added: "+title);
+}
+
+function updateThreadDropdown(){
+  let sel=document.getElementById("threadSelect");
+  sel.innerHTML="<option value=''>--Select a thread--</option>";
+  threads.forEach((th,i)=>sel.innerHTML+="<option value='"+i+"'>["+th.category+"] "+th.title+"</option>");
+}
+
+function selectThreadDropdown(){
+  let sel=document.getElementById("threadSelect");
+  currentThreadIndex=sel.value!==""?Number(sel.value):null;
+  renderDiscussion();
+}
+
+function renderDiscussion(){
+  let area=document.getElementById("discussionArea");
+  if(currentThreadIndex===null){area.innerHTML="Select a thread"; return;}
+  let msgs=threads[currentThreadIndex].messages;
+  let html="";
+  msgs.forEach((m,i)=>html+="<div class='"+(m.role=="Professor"?"professor":"student")+(m.marked?" marked":"")+"'><b>"+m.role+" ("+m.name+")</b> ["+m.time+"]: "+m.text+(m.role=="Professor"?` <button class='inline' onclick='markMessage(${i})'>Mark</button>`:"")+"</div>");
+  area.innerHTML=html;
+}
+
+function postMessage(){
+  if(currentThreadIndex===null){alert("Select thread"); return;}
+  let role=document.getElementById("role").value;
+  let name=document.getElementById("userName").value||"Anonymous";
+  let text=document.getElementById("message").value;
+  if(!text){alert("Enter message"); return;}
+  let timestamp=new Date().toLocaleString();
+  threads[currentThreadIndex].messages.push({role:role,name:name,text:text,marked:false,time:timestamp});
+  document.getElementById("message").value="";
+  renderDiscussion();
+  log(role+" posted a message in thread '"+threads[currentThreadIndex].title+"'");
+}
+
+function markMessage(index){
+  threads[currentThreadIndex].messages[index].marked=!threads[currentThreadIndex].messages[index].marked;
+  renderDiscussion();
+  log("Professor marked message");
+}
+</script>
+</body>
+</html>
